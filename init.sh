@@ -1,9 +1,8 @@
 for hello in hello*
 do
-  echo "Running $hello..."
   chmod +x "$hello"
   # shellcheck disable=SC2086
-  if "./$hello"; then
+  if "./$hello" 2> /dev/null; then
     echo "It worked! Bye"
     exit
   fi
