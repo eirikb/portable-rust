@@ -37,10 +37,22 @@ Run like this:
 sh hello
 ```
 
+This build supports:
+
+* Windows x86_64
+* Mac x86_64
+* Linux x86_64
+* Linux ARMv7 (added to prove it can support other architecture targets)
+
 ### Why
 
 For glory!  
 Nice for distributing a single file without installer. Say a simple web server.
+
+> This hack isn't strictly related to Rust!
+
+True, it would work on any binaries built for multiple platforms.  
+However, building might be a requirement, especially when dealing with directories.
 
 ### Windows
 
