@@ -1,6 +1,6 @@
 on: [ push, pull_request ]
 
-name: Not actually portable rust but a portable script
+name: Not actually portable Rust but a portable script
 jobs:
 
   A-hello-target:

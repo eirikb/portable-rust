@@ -1,4 +1,4 @@
-# Portable rust
+# Portable Rust!
 
 ![hello.png](hello.png)
 <!-- Yes i know "shutterstock" is visible. Hopefully this is more legal =D -->
@@ -12,7 +12,7 @@ means MinGW (git bash) or similar.
 ### How
 
 * Self-extracting shell script
-* Includes one build of your rust app for every target
+* Includes one build of your Rust app for every target
 * Tries to run each app one by one until one hopefully works
 
 ### Dependencies
