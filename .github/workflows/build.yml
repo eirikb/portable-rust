@@ -1,0 +1,222 @@
+on: [ push, pull_request ]
+
+name: Not actually portable rust but a portable script
+jobs:
+
+  A-hello-target:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: cargo pls
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.target }}
+          rustup toolchain install stable-${{ matrix.target }}
+          cargo build --release --target=${{ matrix.target}}
+          find . -type f -name hello.exe -exec cp {} ./hello \;
+          find . -type f -name hello -exec cp {} ./hello \;
+          strip hello
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: hello_${{ matrix.target }}
+          path: hello
+
+  A-hello-target-arch:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - arch: aarch64
+            distro: ubuntu20.04
+            target: armv7-unknown-linux-gnueabihf
+
+    steps:
+      - uses: actions/checkout@v2.1.0
+
+      - uses: uraimo/run-on-arch-action@v2.0.5
+        name: Build artifact
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+
+          githubToken: ${{ github.token }}
+
+          dockerRunArgs: |
+            --volume "${PWD}:/wat"
+
+          shell: /bin/sh
+
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y build-essential curl
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+          run: |
+            cd /wat
+            $HOME/.cargo/bin/cargo build --release
+            du -a
+            find . -type f -name hello -exec cp {} ./hello \;
+            strip hello
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: hello_${{ matrix.target }}
+          path: hello
+
+  B-hello:
+    needs: [ A-hello-target, A-hello-target-arch ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Source
+        uses: actions/checkout@v2.1.0
+
+      - name: Download hello
+        uses: actions/download-artifact@v2
+
+      - name: hello
+        run: |
+          mkdir out
+          for dir in hello_*; do
+            for file in "$dir"/*; do
+              cp "$file" "out/$dir"
+            done
+          done
+          cp init.sh out
+          cd out
+          chmod +x init.sh
+          tar -zpvcf ../hello.tgz  .
+          cd ..
+          cat kick.sh hello.tgz > hello
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: hello
+          path: hello
+
+
+  C-test-os:
+    needs: B-hello
+    strategy:
+      matrix:
+        os: [ ubuntu-18.04, ubuntu-20.04, macos-latest, windows-2016, windows-2019 ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Download hello
+        uses: actions/download-artifact@v2
+        with:
+          name: hello
+
+      - name: Run!
+        run: |
+          sh hello
+
+  C-test-docker:
+    needs: B-hello
+    strategy:
+      matrix:
+        docker: [ alpine, debian, archlinux ]
+
+    runs-on: ubuntu-latest
+    container: ${{ matrix.docker }}
+    steps:
+      - name: Download hello
+        uses: actions/download-artifact@v2
+        with:
+          name: hello
+
+      - name: Run!
+        run: |
+          sh hello
+
+
+  C-test-arch:
+    needs: B-hello
+    strategy:
+      matrix:
+        include:
+          - arch: aarch64
+            distro: ubuntu20.04
+            target: armv7-unknown-linux-gnueabihf
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download hello
+        uses: actions/download-artifact@v2
+        with:
+          name: hello
+
+      - uses: uraimo/run-on-arch-action@v2.0.5
+        name: Build artifact
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+
+          githubToken: ${{ github.token }}
+
+          dockerRunArgs: |
+            --volume "${PWD}:/wat"
+
+          shell: /bin/sh
+
+          run: |
+            cd /wat
+            sh hello
+
+
+  D-release:
+    name: Release!
+    needs: [ C-test-os, C-test-docker, C-test-arch ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate build number
+        id: buildnumber
+        uses: einaregilsson/build-number@v3
+        with:
+          token: ${{ github.token }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tag_name: ${{ steps.buildnumber.outputs.build_number }}
+          release_name: Release ${{ steps.buildnumber.outputs.build_number }}
+          draft: false
+          prerelease: false
+
+      - name: Download hello
+        uses: actions/download-artifact@v2
+        with:
+          name: hello
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token}}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./hello
+          asset_name: hello
+          asset_content_type: text/x-shellscript
