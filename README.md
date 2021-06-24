@@ -9,6 +9,8 @@ systems.
 Systems include anything you like (Windows, Mac, Linux, ARM...), all it requires is a shell to run. For Windows this
 means MinGW (git bash) or similar.
 
+![terminal.png](terminal.png)
+
 ### How
 
 * Self-extracting shell script
